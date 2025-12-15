@@ -1,0 +1,4 @@
+root: data/
+batch_size: 64
+name: Istanbul_PO1
+
