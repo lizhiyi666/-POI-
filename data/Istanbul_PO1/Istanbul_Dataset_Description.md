@@ -1,58 +1,54 @@
-# Istanbul Dataset Description
+# Istanbul_PO1 Dataset Description
 
 ## Overview
 
-This document describes the structure and key components of the Istanbul dataset, including the data fields and their meanings. The dataset includes check-in sequences and contextual conditions, with specific details about time, location, and event-based conditions.
+This document describes the structure and key components of the Istanbul_PO1 dataset, which is an extended version of the original Istanbul dataset. It retains all fields from the original dataset while adding new components related to **partial order (PO) relationships between Points of Interest (POI) categories** in check-in sequences. These additions enable more detailed analysis of sequential patterns in human mobility.
+
 
 ## Data Structure
 
-The dataset is organized as follows:
+The dataset inherits all structural elements from the original Istanbul dataset and introduces new global and sequence-level fields. The core structure is as follows:
 
-* **`sequences`**: Contains check-in sequences.
+- **Inherited from original Istanbul dataset**:
+  - `sequences`: Contains check-in sequences (with extended fields, see below).
+  - `num_marks`: The total number of categories for points of interest (POIs).
+  - `num_pois`: The total number of unique POIs.
+  - `poi_gps`: A dictionary mapping each POI to its GPS coordinates.
+  - `poi_category`: A dictionary mapping each POI to its category.
+  - `t_max`: The maximum time observed in a sequence.
 
-* **`num_marks`**: The total number of categories for points of interest (POIs).
+- **New global fields**:
+  - `category_mapping`: A dictionary mapping each POI category (from `marks`) to a unique integer index. This ensures consistent indexing for partial order calculations.
+  - `po_encoding_dim`: The dimension of the low-dimensional encoding vector for partial order relationships (fixed as 32 in this dataset).
+  - `num_categories`: The total number of unique POI categories (consistent with `num_marks`).
 
-* **`num_pois`**: The total number of unique POIs.
-
-* **`poi_gps`**: A dictionary mapping each POI to its GPS coordinates.
-
-* **`poi_category`**: A dictionary mapping each POI to its category.
-
-* **`t_max`**: The maximum time observed in a sequence.
 
 ## Check-in Sequence Fields
 
-Each check-in sequence contains the following fields:
+Each check-in sequence retains all fields from the original Istanbul dataset and adds two new fields related to partial order relationships:
 
-* **`arrival_times`**: A sequence of timestamps for check-ins. The hour of the day can be directly derived from this field.
+- **Inherited from original Istanbul dataset**:
+  - `arrival_times`: A sequence of timestamps for check-ins. The hour of the day can be directly derived from this field.
+  - `marks`: A sequence of categories corresponding to each check-in.
+  - `checkins`: A sequence of POIs visited during the check-ins.
+  - `gps`: A sequence of GPS coordinates corresponding to the check-in POIs.
+  - `condition1`: Represents the day of the week (values 25–31 for Monday–Sunday).
+  - `condition2`: Represents the Ramadan period (32 = not during Ramadan; 33 = during Ramadan).
+  - `condition3`: Represents public holidays (34 = not during a holiday; 35 = during a holiday).
+  - `condition4`, `condition5`, `condition6`: Unused (constant values for all sequences).
+  - `condition_indicator`: A vector of size 24 (finest time granularity) for context alignment.
 
-* **`marks`**: A sequence of categories corresponding to each check-in.
+- **New sequence-level fields**:
+  - `po_matrix`: A square matrix of shape `(num_categories, num_categories)` representing the full partial order relationships between POI categories in the sequence. A value of `1.0` at `po_matrix[a][b]` indicates that category `a` always appears before category `b` (i.e., the last occurrence of `a` is earlier than the first occurrence of `b` in the sequence).
+  - `po_encoding`: A low-dimensional vector of length `po_encoding_dim` (32) derived from `po_matrix` using Truncated SVD. This encoding compresses the partial order information for efficient use in downstream tasks (e.g., trajectory generation or prediction).
 
-* **`checkins`**: A sequence of POIs visited during the check-ins.
-
-* **`gps`**: A sequence of GPS coordinates corresponding to the check-in POIs.
-
-* **`condition1`**: Represents the day of the week. The value from `25` to `31` represent from Monday to Sunday.
-
-* **`condition2`**: Represents the Ramadan period.
-
-  * `32`: Not during Ramadan.
-
-  * `33`: During Ramadan.
-
-* **`condition3`**: Represents public holidays.
-
-  * `34`: Not during a holiday period.
-
-  * `35`: During a holiday period.
-
-* **`condition4`,** **`condition5`,** **`condition6`**: Not used in the Istanbul dataset. These fields have identical values for all sequences.
-
-* **`condition_indicator`**: A vector of size equal to the number of segments (24 in this dataset), where each segment corresponds to the finest granularity of partial contexts. This indicator is used for context alignment to specify conditions for each sampled timestamp. For further details, refer to Section 4.1.1.
 
 ## Notes
 
-* The fields `condition3`, `condition4`, and `condition5` are not utilized in the Istanbul dataset and are assigned constant values across all sequences.
-
-* The hour of the day is derived directly from `arrival_times` in the code, and encoded from 1\~24, 0 is padding value for contexts.
-
+- The dataset is built by extending the original Istanbul dataset without modifying any existing fields. All新增 fields are compatible with the original data structure.
+- The partial order matrix (`po_matrix`) is constructed based on the first and last occurrence positions of each POI category in the sequence.
+- The low-dimensional encoding (`po_encoding`) is generated by:
+  1. Flattening the `po_matrix` into a 1D vector.
+  2. Standardizing the vector using a pre-fitted scaler.
+  3. Applying Truncated SVD (trained on all sequences from the original train and test sets) to reduce dimensionality to 32.
+- `num_categories` is consistent with `num_marks` from the original dataset, ensuring alignment between category indices and partial order matrices.
